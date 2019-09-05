@@ -1,3 +1,3 @@
 output "module_completed" {
-    value = "${null_resource.installicp.id}"
+    value = "${join(",", list(null_resource.installicp.id))}"
 }

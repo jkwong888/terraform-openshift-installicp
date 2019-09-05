@@ -1,3 +1,9 @@
+resource "null_resource" "dependency" {
+  triggers = {
+    all_dependencies = "${join(",", var.dependson)}"
+  }
+}
+
 data "template_file" "config_yaml" {
   template = "${file("${path.module}/templates/config.yaml.tpl")}"
 
@@ -8,6 +14,9 @@ data "template_file" "config_yaml" {
     icp_admin_password = "${var.icp_admin_password}"
     installmcm         = "${var.installmcm}"
   }
+  depends_on = [
+      "null_resource.dependency",
+  ]
 }
 
 data "template_file" "setup_icpinstall" {
@@ -17,6 +26,9 @@ data "template_file" "setup_icpinstall" {
         icp_install_path = "${var.icp_install_path}"
         ssh_user = "${var.bastion_ssh_user}"
     }
+    depends_on = [
+        "null_resource.dependency",
+    ]
 }
 
 resource "null_resource" "setup_installicp" {
@@ -40,6 +52,9 @@ resource "null_resource" "setup_installicp" {
             "sudo /tmp/setup_icpinstall.sh"
         ]
     }
+    depends_on = [
+        "null_resource.dependency",
+    ]
 }
 
 resource "null_resource" "write_config_yaml" {
@@ -63,9 +78,9 @@ resource "null_resource" "write_config_yaml" {
     }
 
     depends_on = [
+        "null_resource.dependency",
         "null_resource.setup_installicp",
     ]
-
 }
 
 resource "null_resource" "copy_inventory_file" {
@@ -84,9 +99,9 @@ resource "null_resource" "copy_inventory_file" {
     }
 
     depends_on = [
+        "null_resource.dependency",
         "null_resource.setup_installicp",
     ]
-
 }
 
 data "template_file" "installicp" {
@@ -94,6 +109,9 @@ data "template_file" "installicp" {
     vars = {
         icp_install_path = "${var.icp_install_path}"
     }
+    depends_on = [
+        "null_resource.dependency",
+    ]
 }
 
 resource "null_resource" "worker_sysctl" {
@@ -113,6 +131,9 @@ resource "null_resource" "worker_sysctl" {
             "echo vm.max_map_count=262144 | sudo tee -a /etc/sysctl.conf"
         ]
     }
+    depends_on = [
+        "null_resource.dependency",
+    ]
 }
 
 resource "null_resource" "installicp" {
@@ -138,6 +159,7 @@ resource "null_resource" "installicp" {
     }
 
     depends_on = [
+        "null_resource.dependency",
         "null_resource.write_config_yaml",
         "null_resource.setup_installicp",
         "null_resource.copy_inventory_file",
