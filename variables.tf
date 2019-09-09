@@ -4,14 +4,6 @@ variable "bastion_ssh_user" {}
 variable "bastion_ssh_password" {}
 variable "bastion_ssh_private_key" {}
 
-variable "ssh_user" {}
-variable "ssh_password" {
-   default = ""
-}
-variable "ssh_private_key" {
-   default = ""
-}
-
 variable "worker_count" {
     default = 0
 }
