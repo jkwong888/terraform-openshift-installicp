@@ -149,10 +149,11 @@ resource "null_resource" "openshift_client" {
 
   connection {
     type        = "ssh"
-    host        = "${local.bastion_ip}"
-    user        = "${var.ssh_user}"
-    password    = "${var.ssh_password}"
-    private_key = "${var.ssh_private_key}"
+
+    host = "${local.bastion_ip}"
+    user = "${var.bastion_ssh_user}"
+    password = "${var.bastion_ssh_password}"
+    private_key = "${var.bastion_ssh_private_key}"
   }
 
   provisioner "remote-exec" {
