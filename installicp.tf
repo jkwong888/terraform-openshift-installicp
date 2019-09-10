@@ -4,53 +4,98 @@ resource "null_resource" "dependency" {
   }
 }
 
+data "template_file" "disabled_services" {
+  count = "${length(local.all_services)}"
+  template = "disabled"
+}
+
+data "template_file" "enabled_services" {
+  count = "${length(var.enabled_services)}"
+  template = "enabled"
+}
+
 locals {
   bastion_ip = "${var.bastion_ip_address}"
-  # for enabled services map generation
-  default_enabled_list = [
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled",
-    "enabled"
+
+  all_services = [
+    "calico-route-reflector",
+    "platform-security-netpols",
+    "platform-pod-security",
+    "storage-glusterfs",
+    "storage-minio",
+    "istio",
+    "custom-metrics-adapter",
+    "vulnerability-advisor",
+    "node-problem-detector-draino",
+    "multicluster-endpoint",
+    "system-healthcheck-service",
+    "calico/nsx-t",
+    "kmsplugin",
+    "tiller",
+    "image-manager",
+    "kube-dns",
+    "cert-manager",
+    "monitoring-crd",
+    "nvidia-device-plugin",
+    "mongodb",
+    "metrics-server",
+    "nginx-ingress",
+    "service-catalog",
+    "platform-api",
+    "auth-idp",
+    "auth-apikeys",
+    "auth-pap",
+    "auth-pdp",
+    "icp-management-ingress",
+    "platform-ui",
+    "catalog-ui",
+    "security-onboarding",
+    "secret-watcher",
+    "oidcclient-watcher",
+    "metering",
+    "monitoring",
+    "helm-repo",
+    "mgmt-repo",
+    "helm-api",
+    "logging",
+    "image-security-enforcement",
+    "web-terminal",
+    "audit-logging",
+    "key-management",
+    "multicluster-hub",
   ]
 
-  default_disabled_services_map = {
-    "auth-idp" = "disabled"
-    "auth-pap" = "disabled"
-    "auth-pdp" = "disabled"
-    "catalog-ui" = "disabled"
-    "helm-api" = "disabled"
-    "helm-repo" = "disabled"
-    "icp-management-ingress" = "disabled"
-    "metering" = "disabled"
-    "metrics-server" = "disabled"
-    "mgmt-repo" = "disabled"
-    "monitoring" = "disabled"
-    "nginx-ingress" = "disabled"
-    "oidcclient-watcher" = "disabled"
-    "platform-api" = "disabled"
-    "platform-ui" = "disabled"
-    "secret-watcher" = "disabled"
-    "security-onboarding" = "disabled"
-    "web-terminal" = "disabled"
-  }
+  enabled_services_map = "${zipmap(var.enabled_services, data.template_file.enabled_services.*.rendered)}"
 
-  enabled_services_map = "${zipmap(var.enabled_services, slice(local.default_enabled_list, 0, length(var.enabled_services)))}"
-  management_services_map = "${merge(local.default_disabled_services_map, local.enabled_services_map)}"
+  disabled_services_map = "${zipmap(local.all_services, data.template_file.disabled_services.*.rendered)}"
+
+  management_services_map = "${merge(local.disabled_services_map, local.enabled_services_map)}"
+
+  icp_binary_is_docker = "${substr(var.icp_binary, 0, 8) == "docker://"}"
+  icp_image_repo_url = "${local.icp_binary_is_docker ? "${replace(var.icp_binary, "docker://", "")}" : ""}"
+
+  registry_parts = "${split("/", local.icp_image_repo_url)}"
+
+
+  # The final image repo will be either interpolated from what supplied in icp_inception_image or
+  image_repo_url  = "${local.icp_binary_is_docker ? element(local.icp_image_repo_url, 0) : ""}"
+
+  namespace       = "${local.icp_binary_is_docker ? element(local.icp_image_repo_url, 1) : ""}" # This will typically return ibmcom
+
+  image_repo      = "${local.icp_binary_is_docker ? "${local.image_repo_url}/${local.namespace}" : ""}"
+}
+
+data "template_file" "config_yaml_private_repo" {
+  count = "${local.icp_binary_is_docker ? 1 : 0 }"
+
+  template = <<EOF
+image_repo: "${local.image_repo}"
+private_registry_enabled: true
+private_registry_server: "${local.image_repo_url}"
+docker_username: "${var.icp_image_registry_username}"
+docker_password: "${var.icp_image_registry_password}"
+EOF
+
 }
 
 data "template_file" "config_yaml" {
@@ -93,11 +138,14 @@ default_admin_password: ${var.icp_admin_password}
 kubernetes_cluster_type: openshift
 
 management_services:
-${join("\n", formatlist("  %v: %v", keys(local.management_services_map), values(local.management_services_map) ))}"
+${join("\n", formatlist("  %v: %v", keys(local.management_services_map), values(local.management_services_map) ))}
 
 multicluster-hub: ${var.installmcm}
 multicluster-endpoint: ${var.installmcm}
 single_cluster_mode: ${var.installmcm}
+
+${join("\n", data.template_file.config_yaml_private_repo.*.rendered)}
+${join("\n", var.custom_config_yaml)}
 
 EOF
 

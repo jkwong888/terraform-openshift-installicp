@@ -42,7 +42,7 @@ fi
 
 if [ ! -z "$${basename}" ]; then
   sudo tar xf ${icp_install_path}/$${basename} -O | sudo docker load
-  inception_image=$(sudo docker images|grep icp-inception-amd64|awk '{print $1":"$2}')
+  inception_image=$(sudo docker images|grep icp-inception|awk '{print $1":"$2}')
 fi
 
 sudo docker run --rm -v $(pwd):/data:z -e LICENSE=accept --security-opt label:disable $${inception_image} cp -r cluster /data

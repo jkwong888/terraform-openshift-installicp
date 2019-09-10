@@ -59,5 +59,10 @@ variable "dependson" {
 
 variable "enabled_services" {
     type = "list"
-    default = [ "metering", "monitoring", "auth-idp", "cert-manager" ]
+    default = [ "metering", "monitoring", "auth-idp", "cert-manager", "tiller" ]
+}
+
+variable "custom_config_yaml" {
+    type = "list"
+    default = []
 }
